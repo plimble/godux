@@ -1,6 +1,8 @@
 Godux
 -------
 
+[![GoDoc](https://godoc.org/github.com/plimble/godux?status.svg)](https://godoc.org/github.com/plimble/godux)
+
 ## Installation
 ```
 go get -u github.com/plimble/godux
