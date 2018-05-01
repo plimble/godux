@@ -22,7 +22,7 @@ type AppState struct {
 }
 
 func GetUser(username string) godux.ActionCreator {
-	return func(dispatch godux.Dispatch) {
+	return func(dispatch godux.Dispatch, state interface{}) {
 		dispatch(godux.Action{
 			Type:    GET_USER,
 			Payload: username,
@@ -31,7 +31,7 @@ func GetUser(username string) godux.ActionCreator {
 }
 
 func IncreaseCounter() godux.ActionCreator {
-	return func(dispatch godux.Dispatch) {
+	return func(dispatch godux.Dispatch, state interface{}) {
 		dispatch(godux.Action{
 			Type: INCREASE_COUNTER,
 		})

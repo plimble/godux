@@ -43,7 +43,7 @@ func (s *DefaultStore) GetState() interface{} {
 }
 
 func (s *DefaultStore) Dispatch(actionCreator ActionCreator) {
-	actionCreator(s.dispatcher.Dispatch)
+	actionCreator(s.dispatcher.Dispatch, s.state)
 }
 
 func (s *DefaultStore) Subscribe(handler SubscribeHandler) {
