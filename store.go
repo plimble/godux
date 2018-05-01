@@ -1,10 +1,11 @@
 package godux
 
-type SubscribeHandler func(state interface{}, action Action)
+type SubscribeHandler func(action Action)
 type ReducerHandler func(state interface{}, action Action) interface{}
 type Dispatch func(action Action)
 type MiddlewareHandler func(dispatch Dispatch, action Action, next Next)
 type Next func(action Action)
+type GetState func() interface{}
 
 type Store interface {
 	GetState() interface{}
@@ -43,7 +44,7 @@ func (s *DefaultStore) GetState() interface{} {
 }
 
 func (s *DefaultStore) Dispatch(actionCreator ActionCreator) {
-	actionCreator(s.dispatcher.Dispatch, s.state)
+	actionCreator(s.dispatcher.Dispatch, s.GetState)
 }
 
 func (s *DefaultStore) Subscribe(handler SubscribeHandler) {
@@ -86,6 +87,6 @@ func (s *DefaultStore) next(action Action) {
 	}
 
 	for _, handler := range s.subscibers {
-		handler(s.state, action)
+		handler(action)
 	}
 }

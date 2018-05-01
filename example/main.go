@@ -22,7 +22,7 @@ type AppState struct {
 }
 
 func GetUser(username string) godux.ActionCreator {
-	return func(dispatch godux.Dispatch, state interface{}) {
+	return func(dispatch godux.Dispatch, getState godux.GetState) {
 		dispatch(godux.Action{
 			Type:    GET_USER,
 			Payload: username,
@@ -31,7 +31,7 @@ func GetUser(username string) godux.ActionCreator {
 }
 
 func IncreaseCounter() godux.ActionCreator {
-	return func(dispatch godux.Dispatch, state interface{}) {
+	return func(dispatch godux.Dispatch, getState godux.GetState) {
 		dispatch(godux.Action{
 			Type: INCREASE_COUNTER,
 		})
@@ -75,8 +75,8 @@ func main() {
 
 	store.ApplyMiddleware(Logger)
 
-	store.Subscribe(func(s interface{}, action godux.Action) {
-		state := s.(AppState)
+	store.Subscribe(func(action godux.Action) {
+		state := store.GetState().(AppState)
 		fmt.Println("Action", action.Type, "Count", state.Count, "Username", state.User.Username)
 	})
 

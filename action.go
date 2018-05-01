@@ -1,6 +1,6 @@
 package godux
 
-type ActionCreator func(dispatch Dispatch, state interface{})
+type ActionCreator func(dispatch Dispatch, getState GetState)
 
 type Action struct {
 	Type    string
