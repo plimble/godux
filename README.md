@@ -83,7 +83,7 @@ func main() {
 	store := godux.NewStore(AppState{}, []godux.ReducerHandler{
 		UserReducer,
 		CounterReducer,
-	})
+	}, nil)
 	defer store.Close()
 
 	store.ApplyMiddleware(Logger)

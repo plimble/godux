@@ -1,5 +1,7 @@
 package godux
 
+import "sync"
+
 type SubscribeHandler func(state interface{}, action Action)
 type ReducerHandler func(state interface{}, action Action) interface{}
 type Dispatch func(action Action)
@@ -21,9 +23,10 @@ type DefaultStore struct {
 	middlewares []MiddlewareHandler
 	dispatcher  dispatcher
 	close       chan struct{}
+	locker      *sync.Mutex
 }
 
-func NewStore(initState interface{}, reducers []ReducerHandler) Store {
+func NewStore(initState interface{}, reducers []ReducerHandler, locker *sync.Mutex) Store {
 	store := &DefaultStore{
 		state:       initState,
 		reducers:    reducers,
@@ -31,6 +34,7 @@ func NewStore(initState interface{}, reducers []ReducerHandler) Store {
 		dispatcher:  NewDispatcher(),
 		middlewares: make([]MiddlewareHandler, 0),
 		close:       make(chan struct{}, 1),
+		locker:      locker,
 	}
 
 	go store.watch()
@@ -69,12 +73,20 @@ func (s *DefaultStore) watch() {
 		case <-s.close:
 			return
 		case action := <-s.dispatcher.events:
+			if s.locker != nil {
+				s.locker.Lock()
+			}
+
 			if haveMiddleware {
 				for _, handler := range s.middlewares {
 					handler(s.dispatcher.Dispatch, action, s.next)
 				}
 			} else {
 				s.next(action)
+			}
+
+			if s.locker != nil {
+				s.locker.Unlock()
 			}
 		}
 	}
