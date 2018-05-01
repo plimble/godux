@@ -43,6 +43,8 @@ func NewStore(initState interface{}, reducers []ReducerHandler) Store {
 }
 
 func (s *DefaultStore) GetState() interface{} {
+	s.locker.Lock()
+	defer s.locker.Unlock()
 	return s.state
 }
 
