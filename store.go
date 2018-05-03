@@ -78,9 +78,15 @@ func (s *DefaultStore) watch() {
 			if haveMiddleware {
 				for _, handler := range s.middlewares {
 					handler(s.dispatcher.Dispatch, action, s.next)
+					for _, handler := range s.subscibers {
+						handler(action)
+					}
 				}
 			} else {
 				s.next(action)
+				for _, handler := range s.subscibers {
+					handler(action)
+				}
 			}
 		}
 	}
@@ -92,8 +98,4 @@ func (s *DefaultStore) next(action Action) {
 		s.state = handler(s.state, action)
 	}
 	s.locker.Unlock()
-
-	for _, handler := range s.subscibers {
-		handler(action)
-	}
 }
