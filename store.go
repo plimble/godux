@@ -18,23 +18,25 @@ type Store interface {
 }
 
 type DefaultStore struct {
-	state       interface{}
-	reducers    []ReducerHandler
-	subscibers  []SubscribeHandler
-	middlewares []MiddlewareHandler
-	dispatcher  dispatcher
-	close       chan struct{}
-	locker      sync.Mutex
+	state          interface{}
+	reducers       []ReducerHandler
+	subscibers     []SubscribeHandler
+	middlewares    []MiddlewareHandler
+	dispatcher     dispatcher
+	close          chan struct{}
+	locker         sync.Mutex
+	haveMiddleware bool
 }
 
 func NewStore(initState interface{}, reducers []ReducerHandler) Store {
 	store := &DefaultStore{
-		state:       initState,
-		reducers:    reducers,
-		subscibers:  make([]SubscribeHandler, 0),
-		dispatcher:  NewDispatcher(),
-		middlewares: make([]MiddlewareHandler, 0),
-		close:       make(chan struct{}, 1),
+		state:          initState,
+		reducers:       reducers,
+		subscibers:     make([]SubscribeHandler, 0),
+		dispatcher:     NewDispatcher(),
+		middlewares:    make([]MiddlewareHandler, 0),
+		close:          make(chan struct{}, 1),
+		haveMiddleware: false,
 	}
 
 	go store.watch()
@@ -58,6 +60,7 @@ func (s *DefaultStore) Subscribe(handler SubscribeHandler) {
 
 func (s *DefaultStore) ApplyMiddleware(handler MiddlewareHandler) {
 	s.middlewares = append(s.middlewares, handler)
+	s.haveMiddleware = true
 }
 
 func (s *DefaultStore) Close() {
@@ -65,17 +68,12 @@ func (s *DefaultStore) Close() {
 }
 
 func (s *DefaultStore) watch() {
-	haveMiddleware := false
-	if len(s.middlewares) > 0 {
-		haveMiddleware = true
-	}
-
 	for {
 		select {
 		case <-s.close:
 			return
 		case action := <-s.dispatcher.events:
-			if haveMiddleware {
+			if s.haveMiddleware {
 				for _, handler := range s.middlewares {
 					handler(s.dispatcher.Dispatch, action, s.next)
 					for _, handler := range s.subscibers {
