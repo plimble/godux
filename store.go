@@ -2,12 +2,17 @@ package godux
 
 import "sync"
 
-type SubscribeHandler func(action Action)
+type SubscribeHandler func(state interface{}, action Action)
 type ReducerHandler func(state interface{}, action Action) interface{}
 type Dispatch func(action Action)
 type MiddlewareHandler func(dispatch Dispatch, action Action, next Next)
 type Next func(action Action)
 type GetState func() interface{}
+
+type subData struct {
+	action Action
+	state  interface{}
+}
 
 type Store interface {
 	GetState() interface{}
@@ -22,8 +27,10 @@ type DefaultStore struct {
 	reducers       []ReducerHandler
 	subscibers     []SubscribeHandler
 	middlewares    []MiddlewareHandler
-	dispatcher     dispatcher
-	close          chan struct{}
+	dispatcher     chan Action
+	chanSubData    chan subData
+	closeDispatch  chan struct{}
+	closeSub       chan struct{}
 	locker         sync.Mutex
 	haveMiddleware bool
 }
@@ -33,13 +40,16 @@ func NewStore(initState interface{}, reducers []ReducerHandler) Store {
 		state:          initState,
 		reducers:       reducers,
 		subscibers:     make([]SubscribeHandler, 0),
-		dispatcher:     NewDispatcher(),
+		dispatcher:     make(chan Action, 1000),
+		chanSubData:    make(chan subData, 1000),
 		middlewares:    make([]MiddlewareHandler, 0),
-		close:          make(chan struct{}, 1),
+		closeDispatch:  make(chan struct{}, 1),
+		closeSub:       make(chan struct{}, 1),
 		haveMiddleware: false,
 	}
 
-	go store.watch()
+	go store.watchDispatch()
+	go store.watchSub()
 
 	return store
 }
@@ -51,7 +61,7 @@ func (s *DefaultStore) GetState() interface{} {
 }
 
 func (s *DefaultStore) Dispatch(actionCreator ActionCreator) {
-	actionCreator(s.dispatcher.Dispatch, s.GetState)
+	actionCreator(s.dispatch, s.GetState)
 }
 
 func (s *DefaultStore) Subscribe(handler SubscribeHandler) {
@@ -64,30 +74,42 @@ func (s *DefaultStore) ApplyMiddleware(handler MiddlewareHandler) {
 }
 
 func (s *DefaultStore) Close() {
-	s.close <- struct{}{}
+	s.closeDispatch <- struct{}{}
+	s.closeSub <- struct{}{}
 }
 
-func (s *DefaultStore) watch() {
+func (s *DefaultStore) watchDispatch() {
 	for {
 		select {
-		case <-s.close:
+		case <-s.closeDispatch:
 			return
-		case action := <-s.dispatcher.events:
+		case action := <-s.dispatcher:
 			if s.haveMiddleware {
 				for _, handler := range s.middlewares {
-					handler(s.dispatcher.Dispatch, action, s.next)
-					for _, handler := range s.subscibers {
-						handler(action)
-					}
+					handler(s.dispatch, action, s.next)
 				}
 			} else {
 				s.next(action)
-				for _, handler := range s.subscibers {
-					handler(action)
-				}
 			}
 		}
 	}
+}
+
+func (s *DefaultStore) watchSub() {
+	for {
+		select {
+		case <-s.closeSub:
+			return
+		case st := <-s.chanSubData:
+			for _, handler := range s.subscibers {
+				handler(st.state, st.action)
+			}
+		}
+	}
+}
+
+func (s *DefaultStore) dispatch(action Action) {
+	s.dispatcher <- action
 }
 
 func (s *DefaultStore) next(action Action) {
@@ -96,4 +118,5 @@ func (s *DefaultStore) next(action Action) {
 		s.state = handler(s.state, action)
 	}
 	s.locker.Unlock()
+	s.chanSubData <- subData{action, s.state}
 }

@@ -75,9 +75,9 @@ func main() {
 
 	store.ApplyMiddleware(Logger)
 
-	store.Subscribe(func(action godux.Action) {
-		state := store.GetState().(AppState)
-		fmt.Println("Action", action.Type, "Count", state.Count, "Username", state.User.Username)
+	store.Subscribe(func(state interface{}, action godux.Action) {
+		s := state.(AppState)
+		fmt.Println("Action", action.Type, "Count", s.Count, "Username", s.User.Username)
 	})
 
 	store.Dispatch(GetUser("userABC"))

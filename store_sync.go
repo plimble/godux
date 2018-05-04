@@ -9,6 +9,8 @@ type SyncStore struct {
 	reducers       []ReducerHandler
 	subscibers     []SubscribeHandler
 	middlewares    []MiddlewareHandler
+	chanSubData    chan subData
+	closeSub       chan struct{}
 	locker         sync.Mutex
 	haveMiddleware bool
 }
@@ -19,8 +21,12 @@ func NewSyncStore(initState interface{}, reducers []ReducerHandler) Store {
 		reducers:       reducers,
 		subscibers:     make([]SubscribeHandler, 0),
 		middlewares:    make([]MiddlewareHandler, 0),
+		chanSubData:    make(chan subData, 1000),
+		closeSub:       make(chan struct{}, 1),
 		haveMiddleware: false,
 	}
+
+	go store.watchSub()
 
 	return store
 }
@@ -44,20 +50,29 @@ func (s *SyncStore) ApplyMiddleware(handler MiddlewareHandler) {
 	s.haveMiddleware = true
 }
 
-func (s *SyncStore) Close() {}
+func (s *SyncStore) Close() {
+	s.closeSub <- struct{}{}
+}
 
 func (s *SyncStore) dispatch(action Action) {
 	if s.haveMiddleware {
 		for _, handler := range s.middlewares {
 			handler(s.dispatch, action, s.next)
-			for _, handler := range s.subscibers {
-				handler(action)
-			}
 		}
 	} else {
 		s.next(action)
-		for _, handler := range s.subscibers {
-			handler(action)
+	}
+}
+
+func (s *SyncStore) watchSub() {
+	for {
+		select {
+		case <-s.closeSub:
+			return
+		case sd := <-s.chanSubData:
+			for _, handler := range s.subscibers {
+				handler(sd.state, sd.action)
+			}
 		}
 	}
 }
@@ -68,4 +83,5 @@ func (s *SyncStore) next(action Action) {
 		s.state = handler(s.state, action)
 	}
 	s.locker.Unlock()
+	s.chanSubData <- subData{action, s.state}
 }
